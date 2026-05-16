@@ -11,15 +11,17 @@ import (
 
 func Run(ctx context.Context, cfg *config.Config) <-chan *ore.Ore {
 	out := make(chan *ore.Ore, cfg.Mine.BufferSize)
+	ticker := time.NewTicker(cfg.Mine.Delay)
 
 	go func() {
+		defer ticker.Stop()
 		defer close(out)
 		for {
 			select {
 			case <-ctx.Done():
 				slog.Info("Mine closed")
 				return
-			case <-time.After(cfg.Mine.Delay):
+			case <-ticker.C:
 			}
 
 			o := ore.Random(cfg.Ore)

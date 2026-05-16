@@ -2,6 +2,10 @@ mine:
   buffer_size: 20
   delay: 100ms
 
+merchant:
+  buffer_size: 50
+  delay: 2000ms
+
 factory:
   out_buffer_size: 10
   scaler:
@@ -17,6 +21,7 @@ ingot:
 item:
   max_quality: 100
   quality_bonus: 10
+  number_of_items: 3
 
 ore:
   max_capacity: 100

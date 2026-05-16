@@ -6,21 +6,27 @@ import (
 
 	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/ingot"
-	"github.com/Rioverde/mine/internal/ore"
+)
+
+const (
+	Axe = iota
+	Sword
+	Shield
 )
 
 type Item struct {
-	Ingot   *ingot.Ingot
-	Quality int
+	ItemType int
+	Ingot    *ingot.Ingot
+	Quality  int
 }
 
 func (it *Item) Name() string {
-	switch it.Ingot.Ore.Material {
-	case ore.Iron:
+	switch it.ItemType {
+	case Sword:
 		return "Sword"
-	case ore.Copper:
+	case Shield:
 		return "Shield"
-	case ore.Gold:
+	case Axe:
 		return "Axe"
 	}
 	return "Unknown"
@@ -30,8 +36,9 @@ func NewSmithy(cfg config.ItemConfig) func(*ingot.Ingot) *Item {
 	return func(in *ingot.Ingot) *Item {
 		time.Sleep(500 * time.Millisecond)
 		return &Item{
-			Ingot:   in,
-			Quality: min(in.Quality+rand.IntN(cfg.QualityBonus), cfg.MaxQuality),
+			ItemType: rand.IntN(cfg.NumberOfItems),
+			Ingot:    in,
+			Quality:  min(in.Quality+rand.IntN(cfg.QualityBonus), cfg.MaxQuality),
 		}
 	}
 }

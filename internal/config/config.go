@@ -8,14 +8,20 @@ import (
 )
 
 type Config struct {
-	Mine    MineConfig    `yaml:"mine"`
-	Factory FactoryConfig `yaml:"factory"`
-	Ingot   IngotConfig   `yaml:"ingot"`
-	Item    ItemConfig    `yaml:"item"`
-	Ore     OreConfig     `yaml:"ore"`
+	Mine     MineConfig     `yaml:"mine"`
+	Factory  FactoryConfig  `yaml:"factory"`
+	Ingot    IngotConfig    `yaml:"ingot"`
+	Item     ItemConfig     `yaml:"item"`
+	Ore      OreConfig      `yaml:"ore"`
+	Merchant MerchantConfig `yaml:"merchant"`
 }
 
 type MineConfig struct {
+	BufferSize int           `yaml:"buffer_size"`
+	Delay      time.Duration `yaml:"delay"`
+}
+
+type MerchantConfig struct {
 	BufferSize int           `yaml:"buffer_size"`
 	Delay      time.Duration `yaml:"delay"`
 }
@@ -38,8 +44,9 @@ type IngotConfig struct {
 }
 
 type ItemConfig struct {
-	MaxQuality   int `yaml:"max_quality"`
-	QualityBonus int `yaml:"quality_bonus"`
+	MaxQuality    int `yaml:"max_quality"`
+	QualityBonus  int `yaml:"quality_bonus"`
+	NumberOfItems int `yaml:"number_of_items"`
 }
 
 type OreConfig struct {

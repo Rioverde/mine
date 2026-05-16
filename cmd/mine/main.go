@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/Rioverde/mine/internal/config"
@@ -34,19 +35,33 @@ func main() {
 	ingots := factory.New(factory.WithName(ctx, "Smelter"), cfg, ores, ingot.NewSmelter(cfg.Ingot))
 	items := factory.New(factory.WithName(ctx, "Smithy"), cfg, ingots, item.NewSmithy(cfg.Item))
 
-	for v := range items {
-		id, err := storage.SaveItem(ctx, pool, "Smithy", v)
-		if err != nil {
-			slog.Error("save item", "err", err)
-			continue
-		}
-		slog.Info("Weapon delivered",
-			"id", id,
-			"ore", v.Ingot.Ore.Name(),
-			"type", v.Name(),
-			"quality", v.Quality,
-		)
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	slog.Info("Process complete")
+	go func() {
+		defer wg.Done()
+		for v := range items {
+			id, err := storage.SaveItem(ctx, pool, "Smithy", v)
+			if err != nil {
+				slog.Error("save item", "err", err)
+				continue
+			}
+			slog.Info("Weapon delivered to storage",
+				"id", id,
+				"ore", v.Ingot.Ore.Name(),
+				"type", v.Name(),
+				"quality", v.Quality,
+			)
+		}
+	}()
+
+	merchants := factory.StartMerchantStream(ctx, cfg, pool)
+
+	for v := range merchants {
+		slog.Info("Item Ready to deliver", "item", v.String())
+	}
+	slog.Info("Merchant stream stopped")
+	wg.Wait()
+
+	slog.Info("Process complete. All resources cleared cleanly.")
 }

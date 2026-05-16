@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Rioverde/mine/internal/item"
 	"github.com/google/uuid"
@@ -35,6 +36,98 @@ func SaveItem(ctx context.Context, pool *pgxpool.Pool, factoryName string, it *i
 		factoryName,
 	)
 	return id, err
+}
+
+func FetchNextBatch(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	limit int,
+) ([]*ItemDTO, error) {
+
+	var lastTime time.Time
+	var lastID string
+
+	err := pool.QueryRow(ctx, `
+    SELECT last_timestamp, last_id 
+    FROM exporter_checkpoints 
+    WHERE checkpoint_name = 'auction_merchant';
+	`).Scan(&lastTime, &lastID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+        SELECT id, name, quality, ore_material, factory, created_at 
+        FROM items 
+        WHERE (created_at, id) > ($1, $2)
+        ORDER BY created_at ASC, id ASC 
+        LIMIT $3;
+    `, lastTime, lastID, limit)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var totalRows int
+
+	aggrErr := pool.QueryRow(ctx, `
+    SELECT COUNT(*) 
+    FROM items 
+    WHERE (created_at, id) > ($1, $2);
+`, lastTime, lastID).Scan(&totalRows)
+
+	if aggrErr != nil {
+		return nil, aggrErr
+	}
+
+	items := make([]*ItemDTO, 0, limit)
+
+	for rows.Next() {
+		var id, name, material, factory string
+		var quality int
+		var createdAt time.Time
+
+		if err := rows.Scan(&id, &name, &quality, &material, &factory, &createdAt); err != nil {
+			return nil, err
+		}
+
+		it := &ItemDTO{
+			id:        id,
+			name:      name,
+			material:  material,
+			factory:   factory,
+			quality:   quality,
+			createdAt: createdAt,
+		}
+
+		items = append(items, it)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(items) != 0 {
+
+		lastItem := items[len(items)-1]
+
+		_, err := pool.Exec(ctx, `
+            UPDATE exporter_checkpoints 
+            SET
+                last_timestamp = $1,
+                last_id = $2,
+                updated_at = now()
+            WHERE checkpoint_name = 'auction_merchant';
+        `, lastItem.createdAt, lastItem.id)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return items, nil
 }
 
 func env(key, fallback string) string {
