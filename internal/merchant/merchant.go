@@ -1,4 +1,4 @@
-package factory
+package merchant
 
 import (
 	"context"
@@ -6,12 +6,11 @@ import (
 	"time"
 
 	"github.com/Rioverde/mine/internal/config"
-	"github.com/Rioverde/mine/internal/storage"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/Rioverde/mine/internal/repo"
 )
 
-func StartMerchantStream(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool) <-chan *storage.ItemDTO {
-	out := make(chan *storage.ItemDTO, cfg.Merchant.BufferSize)
+func Start(ctx context.Context, cfg *config.Config, r repo.Repo) <-chan *repo.ItemDTO {
+	out := make(chan *repo.ItemDTO, cfg.Merchant.BufferSize)
 	ticker := time.NewTicker(cfg.Merchant.Delay)
 
 	go func() {
@@ -22,10 +21,10 @@ func StartMerchantStream(ctx context.Context, cfg *config.Config, pool *pgxpool.
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				items, err := storage.FetchNextBatch(ctx, pool, cfg.Merchant.BufferSize)
+				items, err := r.FetchNextBatch(ctx, cfg.Merchant.BufferSize)
 				if err != nil {
 					slog.Error("Stream: failed to fetch batch from DB", "err", err)
-					return
+					continue
 				}
 
 				for _, item := range items {
@@ -35,7 +34,6 @@ func StartMerchantStream(ctx context.Context, cfg *config.Config, pool *pgxpool.
 					case out <- item:
 					}
 				}
-
 			}
 		}
 	}()

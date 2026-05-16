@@ -9,11 +9,11 @@ import (
 	"syscall"
 
 	"github.com/Rioverde/mine/internal/config"
+	"github.com/Rioverde/mine/internal/domain"
 	"github.com/Rioverde/mine/internal/factory"
-	"github.com/Rioverde/mine/internal/ingot"
-	"github.com/Rioverde/mine/internal/item"
+	"github.com/Rioverde/mine/internal/merchant"
 	"github.com/Rioverde/mine/internal/mine"
-	"github.com/Rioverde/mine/internal/storage"
+	"github.com/Rioverde/mine/internal/repo"
 )
 
 func main() {
@@ -25,15 +25,15 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	pool, err := storage.Connect(ctx)
+	r, err := repo.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer pool.Close()
+	defer r.Close()
 
 	ores := mine.Run(ctx, cfg)
-	ingots := factory.New(factory.WithName(ctx, "Smelter"), cfg, ores, ingot.NewSmelter(cfg.Ingot))
-	items := factory.New(factory.WithName(ctx, "Smithy"), cfg, ingots, item.NewSmithy(cfg.Item))
+	ingots := factory.New(factory.WithName(ctx, "Smelter"), cfg, ores, domain.NewSmelter(cfg.Ingot))
+	items := factory.New(factory.WithName(ctx, "Smithy"), cfg, ingots, domain.NewSmithy(cfg.Item))
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -41,7 +41,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		for v := range items {
-			id, err := storage.SaveItem(ctx, pool, "Smithy", v)
+			id, err := r.Save(ctx, "Smithy", v)
 			if err != nil {
 				slog.Error("save item", "err", err)
 				continue
@@ -55,7 +55,7 @@ func main() {
 		}
 	}()
 
-	merchants := factory.StartMerchantStream(ctx, cfg, pool)
+	merchants := merchant.Start(ctx, cfg, r)
 
 	for v := range merchants {
 		slog.Info("Item Ready to deliver", "item", v.String())

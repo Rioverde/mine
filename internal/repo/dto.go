@@ -1,4 +1,4 @@
-package storage
+package repo
 
 import (
 	"fmt"
@@ -24,6 +24,7 @@ func (dto *ItemDTO) ToJson() string {
 		dto.createdAt.Format(time.RFC3339),
 	)
 }
+
 func (dto *ItemDTO) String() string {
 	return fmt.Sprintf("ID: %s, Name: %s, Material: %s, Quality: %d, Factory: %s, CreatedAt: %s",
 		dto.id,

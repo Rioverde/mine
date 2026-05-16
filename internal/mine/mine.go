@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/Rioverde/mine/internal/config"
-	"github.com/Rioverde/mine/internal/ore"
+	"github.com/Rioverde/mine/internal/domain"
 )
 
-func Run(ctx context.Context, cfg *config.Config) <-chan *ore.Ore {
-	out := make(chan *ore.Ore, cfg.Mine.BufferSize)
+func Run(ctx context.Context, cfg *config.Config) <-chan *domain.Ore {
+	out := make(chan *domain.Ore, cfg.Mine.BufferSize)
 	ticker := time.NewTicker(cfg.Mine.Delay)
 
 	go func() {
@@ -24,7 +24,7 @@ func Run(ctx context.Context, cfg *config.Config) <-chan *ore.Ore {
 			case <-ticker.C:
 			}
 
-			o := ore.Random(cfg.Ore)
+			o := domain.RandomOre(cfg.Ore)
 			select {
 			case out <- o:
 				slog.Info("Ore found", "material", o.Name(), "capacity", o.Capacity)

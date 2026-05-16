@@ -1,4 +1,4 @@
-package ore
+package domain
 
 import (
 	"math/rand/v2"
@@ -29,7 +29,7 @@ func (o *Ore) Name() string {
 	return "Unknown"
 }
 
-func Random(cfg config.OreConfig) *Ore {
+func RandomOre(cfg config.OreConfig) *Ore {
 	return &Ore{
 		Material: rand.IntN(cfg.NumberOfOres),
 		Capacity: rand.IntN(cfg.MaxCapacity),
