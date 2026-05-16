@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/domain"
@@ -41,11 +42,17 @@ func main() {
 	go func() {
 		defer wg.Done()
 		for v := range items {
-			id, err := r.Save(ctx, "Smithy", v)
+			saveCtx, saveCancel := context.WithTimeout(context.Background(), 2*time.Second)
+
+			id, err := r.Save(saveCtx, "Smithy", v)
+
+			saveCancel()
+
 			if err != nil {
 				slog.Error("save item", "err", err)
 				continue
 			}
+
 			slog.Info("Weapon delivered to storage",
 				"id", id,
 				"ore", v.Ingot.Ore.Name(),
