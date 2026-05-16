@@ -5,22 +5,22 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"time"
 
+	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/factory"
 	"github.com/Rioverde/mine/internal/ingot"
 	"github.com/Rioverde/mine/internal/item"
 	"github.com/Rioverde/mine/internal/mine"
-)
-
-const (
-	runDuration     = 5 * time.Second
-	storageCapacity = 100
-	logFile         = "./app.log"
+	"github.com/Rioverde/mine/internal/storage"
 )
 
 func main() {
-	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o666)
+	cfg, err := config.ReadConfig("config.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	f, err := os.OpenFile(cfg.App.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,22 +28,33 @@ func main() {
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(f, nil)))
 
-	ctx, cancel := context.WithTimeout(context.Background(), runDuration)
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.App.RunDuration)
 	defer cancel()
 
-	ores := mine.Run(ctx)
-	ingots := factory.New(factory.WithName(ctx, "Smelter"), ores, ingot.FromOre)
-	items := factory.New(factory.WithName(ctx, "Smithy"), ingots, item.FromIngot)
+	pool, err := storage.Connect(ctx, cfg.Storage)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	storage := make([]*item.Item, 0, storageCapacity)
+	defer pool.Close()
+
+	ores := mine.Run(ctx, cfg)
+	ingots := factory.New(factory.WithName(ctx, "Smelter"), cfg, ores, ingot.NewSmelter(cfg.Ingot))
+	items := factory.New(factory.WithName(ctx, "Smithy"), cfg, ingots, item.NewSmithy(cfg.Item))
+
 	for v := range items {
+		id, err := storage.SaveItem(ctx, pool, "Smithy", v)
+		if err != nil {
+			slog.Error("save item", "err", err)
+			continue
+		}
 		slog.Info("Weapon delivered",
+			"id", id,
 			"ore", v.Ingot.Ore.Name(),
 			"type", v.Name(),
 			"quality", v.Quality,
 		)
-		storage = append(storage, v)
 	}
 
-	slog.Info("Process complete", "items", len(storage))
+	slog.Info("Process complete")
 }

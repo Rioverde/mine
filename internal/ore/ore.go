@@ -1,16 +1,15 @@
 package ore
 
-import "math/rand/v2"
+import (
+	"math/rand/v2"
+
+	"github.com/Rioverde/mine/internal/config"
+)
 
 const (
 	Iron = iota
 	Copper
 	Gold
-)
-
-const (
-	MaxCapacity  = 100
-	NumberOfOres = 3
 )
 
 type Ore struct {
@@ -30,9 +29,9 @@ func (o *Ore) Name() string {
 	return "Unknown"
 }
 
-func Random() *Ore {
+func Random(cfg config.OreConfig) *Ore {
 	return &Ore{
-		Material: rand.IntN(NumberOfOres),
-		Capacity: rand.IntN(MaxCapacity),
+		Material: rand.IntN(cfg.NumberOfOres),
+		Capacity: rand.IntN(cfg.MaxCapacity),
 	}
 }

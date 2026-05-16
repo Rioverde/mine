@@ -5,17 +5,13 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/ore"
 )
 
-const (
-	BufferSize = 20
-	TickRate   = 100 * time.Millisecond
-)
-
-func Run(ctx context.Context) <-chan *ore.Ore {
-	out := make(chan *ore.Ore, BufferSize)
-	timer := time.NewTicker(TickRate)
+func Run(ctx context.Context, cfg *config.Config) <-chan *ore.Ore {
+	out := make(chan *ore.Ore, cfg.Mine.BufferSize)
+	timer := time.NewTicker(cfg.Mine.TickRate)
 
 	go func() {
 		defer timer.Stop()
@@ -26,7 +22,7 @@ func Run(ctx context.Context) <-chan *ore.Ore {
 				slog.Info("Mine is closed due to the timer")
 				return
 			case <-timer.C:
-				o := ore.Random()
+				o := ore.Random(cfg.Ore)
 				select {
 				case out <- o:
 					slog.Info("Ore found", "material", o.Name(), "capacity", o.Capacity)

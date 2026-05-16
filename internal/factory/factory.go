@@ -4,9 +4,9 @@ import (
 	"context"
 	"log/slog"
 	"sync"
-)
 
-const OutBufferSize = 10
+	"github.com/Rioverde/mine/internal/config"
+)
 
 type nameKey struct{}
 
@@ -21,8 +21,8 @@ func Name(ctx context.Context) string {
 	return ""
 }
 
-func New[T, V any](ctx context.Context, materials <-chan *T, transform func(*T) *V) <-chan *V {
-	out := make(chan *V, OutBufferSize)
+func New[T, V any](ctx context.Context, cfg *config.Config, materials <-chan *T, transform func(*T) *V) <-chan *V {
+	out := make(chan *V, cfg.Factory.OutBufferSize)
 	quit := make(chan struct{})
 	var wg sync.WaitGroup
 
@@ -38,11 +38,11 @@ func New[T, V any](ctx context.Context, materials <-chan *T, transform func(*T) 
 		}
 	}
 
-	for range MinWorkers {
+	for range cfg.Factory.Scaler.MinWorkers {
 		start()
 	}
 
-	autoscaler(ctx, materials, start, stop)
+	autoscaler(ctx, cfg.Factory.Scaler, materials, start, stop)
 
 	go func() {
 		wg.Wait()

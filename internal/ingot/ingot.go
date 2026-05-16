@@ -4,10 +4,9 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/ore"
 )
-
-const MaxQuality = 100
 
 type Ingot struct {
 	Ore     *ore.Ore
@@ -26,10 +25,12 @@ func (i *Ingot) Name() string {
 	return "Unknown"
 }
 
-func FromOre(o *ore.Ore) *Ingot {
-	time.Sleep(200 * time.Millisecond)
-	return &Ingot{
-		Ore:     o,
-		Quality: rand.IntN(MaxQuality),
+func NewSmelter(cfg config.IngotConfig) func(*ore.Ore) *Ingot {
+	return func(o *ore.Ore) *Ingot {
+		time.Sleep(200 * time.Millisecond)
+		return &Ingot{
+			Ore:     o,
+			Quality: rand.IntN(cfg.MaxQuality),
+		}
 	}
 }

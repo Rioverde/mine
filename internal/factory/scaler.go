@@ -6,19 +6,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/Rioverde/mine/internal/config"
 )
 
-const (
-	MinWorkers         = 1
-	MaxWorkers         = 10
-	ScaleUpThreshold   = 15
-	ScaleDownThreshold = 2
-	CheckInterval      = 200 * time.Millisecond
-)
-
-func autoscaler[T any](ctx context.Context, monitorChan <-chan *T, startWorker, stopWorker func()) {
-	timer := time.NewTicker(CheckInterval)
-	var workers int64 = MinWorkers
+func autoscaler[T any](ctx context.Context, cfg config.ScalerConfig, monitorChan <-chan *T, startWorker, stopWorker func()) {
+	timer := time.NewTicker(cfg.CheckInterval)
+	workers := int64(cfg.MinWorkers)
 
 	go func() {
 		defer timer.Stop()
@@ -30,12 +24,12 @@ func autoscaler[T any](ctx context.Context, monitorChan <-chan *T, startWorker, 
 			case <-timer.C:
 				queue := len(monitorChan)
 				current := atomic.LoadInt64(&workers)
-				if queue > ScaleUpThreshold && current < MaxWorkers {
+				if queue > cfg.ScaleUpThreshold && current < int64(cfg.MaxWorkers) {
 					count := atomic.AddInt64(&workers, 1)
 					startWorker()
 					slog.Info("Scale UP", "workers", count, "queue", queue, "factory", Name(ctx))
 				}
-				if queue < ScaleDownThreshold && current > MinWorkers {
+				if queue < cfg.ScaleDownThreshold && current > int64(cfg.MinWorkers) {
 					count := atomic.AddInt64(&workers, -1)
 					stopWorker()
 					slog.Info("Scale DOWN", "workers", count, "queue", queue, "factory", Name(ctx))
