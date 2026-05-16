@@ -4,7 +4,8 @@ import (
 	"context"
 	"log"
 	"log/slog"
-	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/factory"
@@ -20,22 +21,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	f, err := os.OpenFile(cfg.App.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o666)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	slog.SetDefault(slog.New(slog.NewTextHandler(f, nil)))
-
-	ctx, cancel := context.WithTimeout(context.Background(), cfg.App.RunDuration)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	pool, err := storage.Connect(ctx, cfg.Storage)
+	pool, err := storage.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	defer pool.Close()
 
 	ores := mine.Run(ctx, cfg)

@@ -3,17 +3,21 @@ package storage
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/item"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-func Connect(ctx context.Context, cfg config.StorageConfig) (*pgxpool.Pool, error) {
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name,
+func Connect(ctx context.Context) (*pgxpool.Pool, error) {
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		env("STORAGE_DB_USER", "mine"),
+		os.Getenv("STORAGE_DB_PASSWORD"),
+		env("STORAGE_DB_HOST", "localhost"),
+		env("STORAGE_DB_PORT", "5432"),
+		env("STORAGE_DB_NAME", "mine"),
 	)
 	return pgxpool.Connect(ctx, dsn)
 }
@@ -31,4 +35,11 @@ func SaveItem(ctx context.Context, pool *pgxpool.Pool, factoryName string, it *i
 		factoryName,
 	)
 	return id, err
+}
+
+func env(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

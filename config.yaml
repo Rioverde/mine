@@ -1,10 +1,6 @@
-app:
-  run_duration: 5s
-  log_file: ./app.log
-
 mine:
   buffer_size: 20
-  tick_rate: 100ms
+  delay: 100ms
 
 factory:
   out_buffer_size: 10
@@ -29,10 +25,3 @@ ore:
     - iron
     - copper
     - gold
-
-storage:
-  host: ${STORAGE_DB_HOST:-localhost}
-  port: ${STORAGE_DB_PORT:-5432}
-  name: ${STORAGE_DB_NAME:-mine}
-  user: ${STORAGE_DB_USER:-mine}
-  password: ${STORAGE_DB_PASSWORD}

@@ -8,23 +8,16 @@ import (
 )
 
 type Config struct {
-	App     AppConfig     `yaml:"app"`
 	Mine    MineConfig    `yaml:"mine"`
 	Factory FactoryConfig `yaml:"factory"`
 	Ingot   IngotConfig   `yaml:"ingot"`
 	Item    ItemConfig    `yaml:"item"`
 	Ore     OreConfig     `yaml:"ore"`
-	Storage StorageConfig `yaml:"storage"`
-}
-
-type AppConfig struct {
-	RunDuration time.Duration `yaml:"run_duration"`
-	LogFile     string        `yaml:"log_file"`
 }
 
 type MineConfig struct {
 	BufferSize int           `yaml:"buffer_size"`
-	TickRate   time.Duration `yaml:"tick_rate"`
+	Delay      time.Duration `yaml:"delay"`
 }
 
 type FactoryConfig struct {
@@ -55,23 +48,14 @@ type OreConfig struct {
 	Materials    []string `yaml:"materials"`
 }
 
-type StorageConfig struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Name     string `yaml:"name"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-}
-
 func ReadConfig(path string) (*Config, error) {
-	f, err := os.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
 	var c Config
-
-	if err := yaml.Unmarshal(f, &c); err != nil {
+	if err := yaml.Unmarshal(data, &c); err != nil {
 		return nil, err
 	}
 

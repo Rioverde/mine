@@ -1,23 +1,20 @@
 services:
   storage:
     image: postgres:17-alpine
-    container_name: mine-storage
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${STORAGE_DB_NAME:-mine}
-      POSTGRES_USER: ${STORAGE_DB_USER:-mine}
-      POSTGRES_PASSWORD: ${STORAGE_DB_PASSWORD:?STORAGE_DB_PASSWORD is required}
+      POSTGRES_DB: mine
+      POSTGRES_USER: mine
+      POSTGRES_PASSWORD: ${STORAGE_DB_PASSWORD}
     ports:
-      - "${STORAGE_DB_PORT:-5432}:5432"
+      - "5432:5432"
     volumes:
-      - storage_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${STORAGE_DB_USER:-mine} -d ${STORAGE_DB_NAME:-mine}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
-volumes:
-  storage_data:
-    name: mine_storage_data
+  mine:
+    build: .
+    restart: on-failure
+    environment:
+      STORAGE_DB_HOST: storage
+      STORAGE_DB_PASSWORD: ${STORAGE_DB_PASSWORD}
+    depends_on:
+      - storage
