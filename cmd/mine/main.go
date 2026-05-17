@@ -62,27 +62,35 @@ func main() {
 		events.OutboxCleaner(ctx, r, time.Hour)
 	}()
 
-	for item := range items {
-		id := uuid.New()
-		payload := events.NewItemPayload(id.String(), Smithy, item).ToMap()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-		saveCtx, cancel := context.WithTimeout(ctx, cfg.App.SaveTimeout)
-		err := r.SaveItem(saveCtx, id, Smithy, item, payload)
-		cancel()
-		if err != nil {
-			slog.Error("save item", "err", err)
-			continue
+		defer cancel()
+
+		for item := range items {
+			id := uuid.New()
+			payload := events.NewItemPayload(id.String(), Smithy, item).ToMap()
+
+			saveCtx, cancel := context.WithTimeout(ctx, cfg.App.SaveTimeout)
+			err := r.SaveItem(saveCtx, id, Smithy, item, payload)
+			cancel()
+			if err != nil {
+				slog.Error("save item", "err", err)
+				continue
+			}
+
+			slog.Info("item saved",
+				"id", id,
+				"type", item.Name(),
+				"quality", item.Quality,
+				"ore", item.Ingot.Ore.Name(),
+			)
 		}
 
-		slog.Info("item saved",
-			"id", id,
-			"type", item.Name(),
-			"quality", item.Quality,
-			"ore", item.Ingot.Ore.Name(),
-		)
-	}
+		slog.Info("DB Writer: all items processed and saved.")
+	}()
 
-	cancel()
 	wg.Wait()
 	slog.Info("Process complete. All resources cleared cleanly.")
 }

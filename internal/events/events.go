@@ -26,6 +26,7 @@ type Event struct {
 type Bus interface {
 	Publish(ctx context.Context, values map[string]any) (string, error)
 	Subscribe(ctx context.Context, buffer int) <-chan Event
+	Ack(ctx context.Context, eventID string) error
 	Close() error
 }
 
@@ -99,17 +100,18 @@ func (b *redisBus) Subscribe(ctx context.Context, buffer int) <-chan Event {
 					case <-ctx.Done():
 						return
 					case out <- event:
-						//TODO Do this inside of the other service
-						// err := b.rdb.XAck(ctx, streamKey, groupName, msg.ID).Err()
-						// if err != nil {
-						// 	slog.Error("events: XAck failed", "err", err, "id", msg.ID)
-						// }
+						//TODO Do this inside of the merchant service
+						// err = bus.Ack(ctx, event.ID)
 					}
 				}
 			}
 		}
 	}()
 	return out
+}
+
+func (b *redisBus) Ack(ctx context.Context, eventID string) error {
+	return b.rdb.XAck(ctx, streamKey, groupName, eventID).Err()
 }
 
 func (b *redisBus) Close() error {
