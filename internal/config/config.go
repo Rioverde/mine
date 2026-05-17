@@ -7,13 +7,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type AppConfig struct {
+	CacheStreamMaxLength int           `yaml:"cache_stream_max_length"`
+	BufferSize           int           `yaml:"buffer_size"`
+	CacheSyncDuration    time.Duration `yaml:"sync_delay"`
+	SaveTimeout          time.Duration `yaml:"save_timeout"`
+	PublishTimeout       time.Duration `yaml:"publish_timeout"`
+}
+
 type Config struct {
-	Mine     MineConfig     `yaml:"mine"`
-	Factory  FactoryConfig  `yaml:"factory"`
-	Ingot    IngotConfig    `yaml:"ingot"`
-	Item     ItemConfig     `yaml:"item"`
-	Ore      OreConfig      `yaml:"ore"`
-	Merchant MerchantConfig `yaml:"merchant"`
+	App     AppConfig     `yaml:"app"`
+	Mine    MineConfig    `yaml:"mine"`
+	Factory FactoryConfig `yaml:"factory"`
+	Ingot   IngotConfig   `yaml:"ingot"`
+	Item    ItemConfig    `yaml:"item"`
+	Ore     OreConfig     `yaml:"ore"`
+	Events  EventsConfig  `yaml:"events"`
 }
 
 type MineConfig struct {
@@ -21,7 +30,7 @@ type MineConfig struct {
 	Delay      time.Duration `yaml:"delay"`
 }
 
-type MerchantConfig struct {
+type EventsConfig struct {
 	BufferSize int           `yaml:"buffer_size"`
 	Delay      time.Duration `yaml:"delay"`
 }
@@ -44,9 +53,8 @@ type IngotConfig struct {
 }
 
 type ItemConfig struct {
-	MaxQuality    int `yaml:"max_quality"`
-	QualityBonus  int `yaml:"quality_bonus"`
-	NumberOfItems int `yaml:"number_of_items"`
+	MaxQuality   int `yaml:"max_quality"`
+	QualityBonus int `yaml:"quality_bonus"`
 }
 
 type OreConfig struct {

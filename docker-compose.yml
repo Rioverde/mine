@@ -10,11 +10,25 @@ services:
     volumes:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
+  cache:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - cache_data:/data
+
   mine:
     build: .
     restart: on-failure
     environment:
       STORAGE_DB_HOST: storage
       STORAGE_DB_PASSWORD: ${STORAGE_DB_PASSWORD}
+      CACHE_HOST: cache
+      CACHE_PORT: 6379
     depends_on:
       - storage
+      - cache
+
+volumes:
+  cache_data:

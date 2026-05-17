@@ -11,10 +11,16 @@ import (
 
 	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/domain"
+	"github.com/Rioverde/mine/internal/events"
 	"github.com/Rioverde/mine/internal/factory"
-	"github.com/Rioverde/mine/internal/merchant"
 	"github.com/Rioverde/mine/internal/mine"
 	"github.com/Rioverde/mine/internal/repo"
+	"github.com/google/uuid"
+)
+
+const (
+	Smithy  = "Smithy"
+	Smelter = "Smelter"
 )
 
 func main() {
@@ -32,43 +38,51 @@ func main() {
 	}
 	defer r.Close()
 
+	bus, err := events.Connect(ctx, cfg.App.CacheStreamMaxLength)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer bus.Close()
+
 	ores := mine.Run(ctx, cfg)
-	ingots := factory.New(factory.WithName(ctx, "Smelter"), cfg, ores, domain.NewSmelter(cfg.Ingot))
-	items := factory.New(factory.WithName(ctx, "Smithy"), cfg, ingots, domain.NewSmithy(cfg.Item))
+	ingots := factory.New(factory.WithName(ctx, Smelter), cfg, ores, domain.NewSmelter(cfg.Ingot))
+	items := factory.New(factory.WithName(ctx, Smithy), cfg, ingots, domain.NewSmithy(cfg.Item))
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for v := range items {
-			saveCtx, saveCancel := context.WithTimeout(context.Background(), 2*time.Second)
-
-			id, err := r.Save(saveCtx, "Smithy", v)
-
-			saveCancel()
-
-			if err != nil {
-				slog.Error("save item", "err", err)
-				continue
-			}
-
-			slog.Info("Weapon delivered to storage",
-				"id", id,
-				"ore", v.Ingot.Ore.Name(),
-				"type", v.Name(),
-				"quality", v.Quality,
-			)
-		}
+		events.OutboxPublisher(ctx, r, bus, &cfg.App)
 	}()
 
-	merchants := merchant.Start(ctx, cfg, r)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		events.OutboxCleaner(ctx, r, time.Hour)
+	}()
 
-	for v := range merchants {
-		slog.Info("Item Ready to deliver", "item", v.String())
+	for item := range items {
+		id := uuid.New()
+		payload := events.NewItemPayload(id.String(), Smithy, item).ToMap()
+
+		saveCtx, cancel := context.WithTimeout(ctx, cfg.App.SaveTimeout)
+		err := r.SaveItem(saveCtx, id, Smithy, item, payload)
+		cancel()
+		if err != nil {
+			slog.Error("save item", "err", err)
+			continue
+		}
+
+		slog.Info("item saved",
+			"id", id,
+			"type", item.Name(),
+			"quality", item.Quality,
+			"ore", item.Ingot.Ore.Name(),
+		)
 	}
-	slog.Info("Merchant stream stopped")
-	wg.Wait()
 
+	cancel()
+	wg.Wait()
 	slog.Info("Process complete. All resources cleared cleanly.")
 }

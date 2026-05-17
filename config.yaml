@@ -1,19 +1,26 @@
+app:
+  cache_stream_max_length: 10000
+  sync_delay: 2s
+  buffer_size: 100
+  save_timeout: 1s
+  publish_timeout: 5s
+
 mine:
   buffer_size: 20
   delay: 100ms
 
-merchant:
+events:
   buffer_size: 50
-  delay: 2000ms
+  delay: 2s
 
 factory:
-  out_buffer_size: 10
+  out_buffer_size: 20
   scaler:
     min_workers: 1
     max_workers: 10
-    scale_up_threshold: 15
-    scale_down_threshold: 2
-    check_interval: 200ms
+    scale_up_threshold: 14
+    scale_down_threshold: 4
+    check_interval: 500ms
 
 ingot:
   max_quality: 100
@@ -21,7 +28,6 @@ ingot:
 item:
   max_quality: 100
   quality_bonus: 10
-  number_of_items: 3
 
 ore:
   max_capacity: 100

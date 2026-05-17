@@ -2,21 +2,34 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/Rioverde/mine/internal/domain"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type Repo interface {
-	Save(ctx context.Context, factoryName string, it *domain.Item) (uuid.UUID, error)
-	FetchNextBatch(ctx context.Context, limit int) ([]*ItemDTO, error)
+	SaveItem(ctx context.Context, id uuid.UUID, factoryName string, it *domain.Item, payload map[string]any) error
+	DrainOutbox(ctx context.Context, limit int, publish PublishFunc) (int, error)
+	DeleteExpiredOutbox(ctx context.Context) (int64, error)
 	Close()
 }
+
+type OutboxRow struct {
+	ID      int64
+	ItemID  uuid.UUID
+	Payload map[string]any
+}
+
+// PublishFunc is called for each fetched outbox row. Returning nil marks the row as sent.
+// Returning an error stops draining and rolls back the unfinished portion (already-sent rows
+// in the batch up to the failure are committed).
+type PublishFunc func(OutboxRow) error
 
 type pgxRepo struct {
 	pool *pgxpool.Pool
@@ -41,85 +54,110 @@ func (r *pgxRepo) Close() {
 	r.pool.Close()
 }
 
-func (r *pgxRepo) Save(ctx context.Context, factoryName string, it *domain.Item) (uuid.UUID, error) {
-	id := uuid.New()
-	_, err := r.pool.Exec(ctx, `
+func (r *pgxRepo) SaveItem(ctx context.Context, id uuid.UUID, factoryName string, it *domain.Item, payload map[string]any) error {
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
         INSERT INTO items (id, name, quality, ore_material, ore_capacity, ingot_quality, factory)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `,
 		id,
 		it.Name(), it.Quality,
 		strings.ToLower(it.Ingot.Ore.Name()),
 		it.Ingot.Ore.Capacity,
 		it.Ingot.Quality,
 		factoryName,
-	)
-	return id, err
+	); err != nil {
+		return fmt.Errorf("insert items: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+        INSERT INTO outbox (item_id, payload) VALUES ($1, $2)
+    `, id, payloadJSON); err != nil {
+		return fmt.Errorf("insert outbox: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
-func (r *pgxRepo) FetchNextBatch(ctx context.Context, limit int) ([]*ItemDTO, error) {
-	var lastTime time.Time
-	var lastID string
-
-	err := r.pool.QueryRow(ctx, `
-        SELECT last_timestamp, last_id
-        FROM exporter_checkpoints
-        WHERE checkpoint_name = 'auction_merchant';
-    `).Scan(&lastTime, &lastID)
+func (r *pgxRepo) DrainOutbox(ctx context.Context, limit int, publish PublishFunc) (int, error) {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return nil, err
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, `
+        SELECT id, item_id, payload
+        FROM outbox
+        WHERE sent_at IS NULL
+        ORDER BY id ASC
+        LIMIT $1
+        FOR UPDATE SKIP LOCKED
+    `, limit)
+	if err != nil {
+		return 0, fmt.Errorf("select outbox: %w", err)
 	}
 
-	rows, err := r.pool.Query(ctx, `
-        SELECT id, name, quality, ore_material, factory, created_at
-        FROM items
-        WHERE (created_at, id) > ($1, $2)
-        ORDER BY created_at ASC, id ASC
-        LIMIT $3;
-    `, lastTime, lastID, limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	items := make([]*ItemDTO, 0, limit)
+	batch := make([]OutboxRow, 0, limit)
 	for rows.Next() {
-		var id, name, material, factory string
-		var quality int
-		var createdAt time.Time
-
-		if err := rows.Scan(&id, &name, &quality, &material, &factory, &createdAt); err != nil {
-			return nil, err
+		var row OutboxRow
+		var payloadJSON []byte
+		if err := rows.Scan(&row.ID, &row.ItemID, &payloadJSON); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("scan outbox: %w", err)
 		}
-
-		items = append(items, &ItemDTO{
-			id:        id,
-			name:      name,
-			material:  material,
-			factory:   factory,
-			quality:   quality,
-			createdAt: createdAt,
-		})
+		if err := json.Unmarshal(payloadJSON, &row.Payload); err != nil {
+			rows.Close()
+			return 0, fmt.Errorf("unmarshal payload id=%d: %w", row.ID, err)
+		}
+		batch = append(batch, row)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, err
+	if len(batch) == 0 {
+		return 0, tx.Commit(ctx)
 	}
 
-	if len(items) != 0 {
-		last := items[len(items)-1]
-		if _, err := r.pool.Exec(ctx, `
-            UPDATE exporter_checkpoints
-            SET
-                last_timestamp = $1,
-                last_id = $2,
-                updated_at = now()
-            WHERE checkpoint_name = 'auction_merchant';
-        `, last.createdAt, last.id); err != nil {
-			return nil, err
+	sentIDs := make([]int64, 0, len(batch))
+	for _, row := range batch {
+		if err := publish(row); err != nil {
+			break
+		}
+		sentIDs = append(sentIDs, row.ID)
+	}
+
+	if len(sentIDs) > 0 {
+		if _, err := tx.Exec(ctx, `
+            UPDATE outbox SET sent_at = now() WHERE id = ANY($1)
+        `, sentIDs); err != nil {
+			return 0, fmt.Errorf("mark sent: %w", err)
 		}
 	}
 
-	return items, nil
+	return len(sentIDs), tx.Commit(ctx)
+}
+
+func (r *pgxRepo) DeleteExpiredOutbox(ctx context.Context) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `
+        DELETE FROM outbox WHERE sent_at < now() - INTERVAL '7 days'
+    `)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 func env(key, fallback string) string {
