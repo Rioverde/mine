@@ -26,9 +26,6 @@ type OutboxRow struct {
 	Payload map[string]any
 }
 
-// PublishFunc is called for each fetched outbox row. Returning nil marks the row as sent.
-// Returning an error stops draining and rolls back the unfinished portion (already-sent rows
-// in the batch up to the failure are committed).
 type PublishFunc func(OutboxRow) error
 
 type pgxRepo struct {
