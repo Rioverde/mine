@@ -22,10 +22,26 @@ CREATE TABLE IF NOT EXISTS outbox (
     sent_at     TIMESTAMPTZ
 );
 
--- Partial index makes "fetch pending" trivial — only scans unsent rows
 CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(id) WHERE sent_at IS NULL;
-
--- Partial index for cleanup: only sent rows, ordered by sent_at
 CREATE INDEX IF NOT EXISTS idx_outbox_sent ON outbox(sent_at) WHERE sent_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS treasury (
+    id INT PRIMARY KEY DEFAULT 1,
+    balance_copper BIGINT NOT NULL DEFAULT 10000000,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT single_row CHECK (id = 1)
+);
+
+CREATE TABLE IF NOT EXISTS contracts (
+    id UUID PRIMARY KEY,
+    target_item VARCHAR(50) NOT NULL,
+    target_material VARCHAR(50) NOT NULL,
+    min_quality INT NOT NULL DEFAULT 0,
+    required_qty INT NOT NULL,
+    reward_copper BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 COMMIT;

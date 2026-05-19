@@ -22,6 +22,15 @@ factory:
     scale_down_threshold: 4
     check_interval: 500ms
 
+economy:
+  contract_generation_interval: 30s
+  contract_lifetime: 5m
+  max_active_contracts: 3
+
+  min_contract_reward: 50000
+  max_contract_reward: 200000
+  tax_rate_percent: 10
+
 ingot:
   max_quality: 100
 

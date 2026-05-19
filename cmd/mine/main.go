@@ -32,11 +32,14 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	r, err := repo.Connect(ctx)
+	conn, err := repo.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer r.Close()
+	defer conn.Close()
+
+	itemRepo := conn.Items()
+	outboxRepo := conn.Outbox()
 
 	bus, err := events.Connect(ctx, cfg.App.CacheStreamMaxLength)
 	if err != nil {
@@ -53,19 +56,18 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		events.OutboxPublisher(ctx, r, bus, &cfg.App)
+		events.OutboxPublisher(ctx, outboxRepo, bus, &cfg.App)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		events.OutboxCleaner(ctx, r, time.Hour)
+		events.OutboxCleaner(ctx, outboxRepo, time.Hour)
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		defer cancel()
 
 		for item := range items {
@@ -73,7 +75,7 @@ func main() {
 			payload := events.NewItemPayload(id.String(), Smithy, item).ToMap()
 
 			saveCtx, cancel := context.WithTimeout(ctx, cfg.App.SaveTimeout)
-			err := r.SaveItem(saveCtx, id, Smithy, item, payload)
+			err := itemRepo.SaveItem(saveCtx, id, Smithy, item, payload)
 			cancel()
 			if err != nil {
 				slog.Error("save item", "err", err)

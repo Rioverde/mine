@@ -9,7 +9,11 @@ import (
 	"github.com/Rioverde/mine/internal/repo"
 )
 
-func OutboxPublisher(ctx context.Context, r repo.Repo, bus Bus, cfg *config.AppConfig) {
+// OutboxPublisher periodically drains the outbox table to the bus.
+// Each tick claims pending rows via FOR UPDATE SKIP LOCKED (safe for parallel publishers),
+// publishes them, and marks sent — all in a single transaction.
+// Stops only when ctx is cancelled.
+func OutboxPublisher(ctx context.Context, r repo.OutboxRepository, bus Bus, cfg *config.AppConfig) {
 	ticker := time.NewTicker(cfg.CacheSyncDuration)
 	defer ticker.Stop()
 

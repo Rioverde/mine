@@ -8,7 +8,10 @@ import (
 	"github.com/Rioverde/mine/internal/repo"
 )
 
-func OutboxCleaner(ctx context.Context, r repo.Repo, interval time.Duration) {
+// OutboxCleaner periodically removes outbox rows older than the retention window
+// (currently hardcoded to 7 days in repo.DeleteExpiredOutbox).
+// Stops only when ctx is cancelled.
+func OutboxCleaner(ctx context.Context, r repo.OutboxRepository, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 

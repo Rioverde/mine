@@ -15,6 +15,15 @@ type AppConfig struct {
 	PublishTimeout       time.Duration `yaml:"publish_timeout"`
 }
 
+type EconomyConfig struct {
+	ContractGenerationInterval time.Duration `yaml:"contract_generation_interval"`
+	ContractLifetime           time.Duration `yaml:"contract_lifetime"`
+	MaxActiveContracts         int           `yaml:"max_active_contracts"`
+	MinContractReward          int64         `yaml:"min_contract_reward"`
+	MaxContractReward          int64         `yaml:"max_contract_reward"`
+	TaxRatePercent             int           `yaml:"tax_rate_percent"`
+}
+
 type Config struct {
 	App     AppConfig     `yaml:"app"`
 	Mine    MineConfig    `yaml:"mine"`
@@ -22,6 +31,7 @@ type Config struct {
 	Ingot   IngotConfig   `yaml:"ingot"`
 	Item    ItemConfig    `yaml:"item"`
 	Ore     OreConfig     `yaml:"ore"`
+	Economy EconomyConfig `yaml:"economy"`
 	Events  EventsConfig  `yaml:"events"`
 }
 
