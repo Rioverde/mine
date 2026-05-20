@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/Rioverde/mine/internal/config"
 	"github.com/Rioverde/mine/internal/domain"
@@ -38,32 +37,18 @@ func main() {
 	}
 	defer conn.Close()
 
-	itemRepo := conn.Items()
-	outboxRepo := conn.Outbox()
+	itemRepo := conn.NewItemRepository()
+	kingdomRepo := conn.NewKingdomRepository()
 
-	bus, err := events.Connect(ctx, cfg.App.CacheStreamMaxLength)
-	if err != nil {
+	if err := kingdomRepo.EnsureKingdom(ctx, cfg.Kingdom.ID, cfg.Kingdom.Name); err != nil {
 		log.Fatal(err)
 	}
-	defer bus.Close()
 
 	ores := mine.Run(ctx, cfg)
 	ingots := factory.New(factory.WithName(ctx, Smelter), cfg, ores, domain.NewSmelter(cfg.Ingot))
 	items := factory.New(factory.WithName(ctx, Smithy), cfg, ingots, domain.NewSmithy(cfg.Item))
 
 	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		events.OutboxPublisher(ctx, outboxRepo, bus, &cfg.App)
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		events.OutboxCleaner(ctx, outboxRepo, time.Hour)
-	}()
 
 	wg.Add(1)
 	go func() {

@@ -5,6 +5,10 @@ app:
   save_timeout: 1s
   publish_timeout: 5s
 
+kingdom:
+  id: 00000000-0000-0000-0000-000000000001
+  name: default
+
 mine:
   buffer_size: 20
   delay: 100ms

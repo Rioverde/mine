@@ -4,6 +4,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,8 +25,14 @@ type EconomyConfig struct {
 	TaxRatePercent             int           `yaml:"tax_rate_percent"`
 }
 
+type KingdomConfig struct {
+	ID   uuid.UUID `yaml:"id"`
+	Name string    `yaml:"name"`
+}
+
 type Config struct {
 	App     AppConfig     `yaml:"app"`
+	Kingdom KingdomConfig `yaml:"kingdom"`
 	Mine    MineConfig    `yaml:"mine"`
 	Factory FactoryConfig `yaml:"factory"`
 	Ingot   IngotConfig   `yaml:"ingot"`

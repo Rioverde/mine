@@ -33,13 +33,17 @@ func (c *Connection) Close() {
 }
 
 // Items returns a narrow repository used by the producer pipeline.
-func (c *Connection) Items() ItemRepository {
+func (c *Connection) NewItemRepository() ItemRepository {
 	return &pgItemRepo{pool: c.pool}
 }
 
 // Outbox returns a narrow repository used by the publisher and cleaner.
-func (c *Connection) Outbox() OutboxRepository {
+func (c *Connection) NewOutboxRepository() OutboxRepository {
 	return &pgOutboxRepo{pool: c.pool}
+}
+
+func (c *Connection) NewKingdomRepository() KingdomRepository {
+	return &pgxKingdomRepo{pool: c.pool}
 }
 
 func env(key, fallback string) string {

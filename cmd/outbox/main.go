@@ -3,18 +3,18 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/Rioverde/mine/internal/config"
-	"github.com/Rioverde/mine/internal/contract"
 	"github.com/Rioverde/mine/internal/events"
 	"github.com/Rioverde/mine/internal/repo"
 )
 
 func main() {
-
 	cfg, err := config.ReadConfig("config.yaml")
 	if err != nil {
 		log.Fatal(err)
@@ -29,11 +29,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	kingdomRepo := conn.NewKingdomRepository()
-
-	if err := kingdomRepo.EnsureKingdom(ctx, cfg.Kingdom.ID, cfg.Kingdom.Name); err != nil {
-		log.Fatal(err)
-	}
+	outboxRepo := conn.NewOutboxRepository()
 
 	bus, err := events.Connect(ctx, cfg.App.CacheStreamMaxLength)
 	if err != nil {
@@ -46,9 +42,15 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		contract.GenerateContract(ctx, cfg, kingdomRepo)
+		events.OutboxPublisher(ctx, outboxRepo, bus, &cfg.App)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		events.OutboxCleaner(ctx, outboxRepo, time.Hour)
 	}()
 
 	wg.Wait()
-
+	slog.Info("Outbox service stopped.")
 }

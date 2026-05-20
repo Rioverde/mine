@@ -25,23 +25,32 @@ CREATE TABLE IF NOT EXISTS outbox (
 CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(id) WHERE sent_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_outbox_sent ON outbox(sent_at) WHERE sent_at IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS kingdoms (
+    id         UUID        PRIMARY KEY,
+    name       TEXT        NOT NULL UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS treasury (
-    id INT PRIMARY KEY DEFAULT 1,
-    balance_copper BIGINT NOT NULL DEFAULT 10000000,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CONSTRAINT single_row CHECK (id = 1)
+    kingdom_id     UUID        PRIMARY KEY REFERENCES kingdoms(id) ON DELETE CASCADE,
+    balance_copper BIGINT      NOT NULL DEFAULT 10000000,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS contracts (
-    id UUID PRIMARY KEY,
-    target_item VARCHAR(50) NOT NULL,
-    target_material VARCHAR(50) NOT NULL,
-    min_quality INT NOT NULL DEFAULT 0,
-    required_qty INT NOT NULL,
-    reward_copper BIGINT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id              UUID         PRIMARY KEY,
+    kingdom_id      UUID         NOT NULL REFERENCES kingdoms(id),
+    target_item     VARCHAR(50)  NOT NULL,
+    target_material VARCHAR(50)  NOT NULL,
+    min_quality     INT          NOT NULL DEFAULT 0,
+    required_qty    INT          NOT NULL,
+    reward_copper   BIGINT       NOT NULL,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'active',
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_contracts_kingdom ON contracts(kingdom_id);
+CREATE INDEX IF NOT EXISTS idx_contracts_status  ON contracts(status);
 
 COMMIT;
